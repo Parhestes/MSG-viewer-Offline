@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSG Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f3f3f3;
+    --surface: #ffffff;
+    --surface-alt: #f9f9fb;
+    --border: #e0e0e0;
+    --border-light: #ebebeb;
+    --text: #1a1a1a;
+    --text-secondary: #605e5c;
+    --text-dim: #8a8886;
+    --accent: #0078d4;
+    --accent-hover: #106ebe;
+    --accent-soft: rgba(0,120,212,0.08);
+    --accent-soft2: rgba(0,120,212,0.15);
+    --blue-bg: #e8f0fe;
+    --green: #107c10;
+    --orange: #ca5010;
+    --red: #d13438;
+    --radius: 8px;
+    --radius-sm: 5px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow: 0 2px 8px rgba(0,0,0,0.1);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+    --font: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+
+  /* ── Header ── */
+  .app-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0 20px; border-bottom: 1px solid var(--border-light);
+    margin-bottom: 24px;
+  }
+  .app-logo {
+    width: 36px; height: 36px; border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, #0078d4, #00bcf2);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 15px;
+  }
+  .app-title { font-size: 18px; font-weight: 600; color: var(--text); }
+  .app-title span { color: var(--text-dim); font-weight: 400; font-size: 13px; margin-left: 8px; }
+
+  /* ── Drop Zone ── */
+  .dropzone-wrap { display: block; }
+  .dropzone-wrap.hidden { display: none; }
+
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 64px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+    position: relative;
+    box-shadow: var(--shadow-sm);
+  }
+  .dropzone:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .dropzone.drag-over { border-color: var(--accent); background: var(--accent-soft); transform: scale(1.005); }
+
+  .dz-icon {
+    width: 52px; height: 52px; margin: 0 auto 18px;
+    border-radius: 50%; background: var(--accent-soft);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dz-icon svg { width: 24px; height: 24px; color: var(--accent); }
+  .dropzone h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+  .dropzone p { color: var(--text-dim); font-size: 13px; }
+  .dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .error-toast {
+    margin-top: 12px; padding: 10px 16px; background: #fde7e9; border: 1px solid #f1bbbc;
+    color: var(--red); border-radius: var(--radius-sm); font-size: 13px; display: none;
+  }
+  .error-toast.show { display: block; }
+
+  /* ── File List ── */
+  .file-list { margin-top: 16px; display: none; }
+  .file-list.show { display: block; }
+  .file-chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; background: var(--surface); border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm); margin-bottom: 6px; cursor: pointer; transition: all 0.15s;
+    box-shadow: var(--shadow-sm);
+  }
+  .file-chip:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .file-chip svg { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; }
+  .file-chip-name { flex: 1; font-size: 13px; font-weight: 500; }
+  .file-chip-arrow { color: var(--text-dim); font-size: 16px; }
+
+  /* ── Email View ── */
+  .email-view { display: none; }
+  .email-view.active { display: block; animation: slideIn 0.3s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .btn-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--border-light);
+    color: var(--text-secondary); padding: 7px 14px; border-radius: var(--radius-sm);
+    cursor: pointer; font-size: 12px; font-family: var(--font);
+    margin-bottom: 16px; transition: all 0.15s; box-shadow: var(--shadow-sm);
+  }
+  .btn-back:hover { color: var(--accent); border-color: var(--accent); }
+  .btn-back svg { width: 14px; height: 14px; }
+
+  /* ── Email Envelope (Outlook-style) ── */
+  .envelope {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .envelope-header {
+    padding: 24px 28px 20px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .env-subject {
+    font-size: 20px; font-weight: 700; color: var(--text);
+    line-height: 1.35; margin-bottom: 18px;
+  }
+
+  .env-row {
+    display: flex; align-items: flex-start; gap: 0;
+    padding: 5px 0; font-size: 13px; line-height: 1.5;
+  }
+  .env-label {
+    width: 72px; flex-shrink: 0;
+    font-weight: 600; color: var(--text-secondary);
+  }
+  .env-value {
+    flex: 1; color: var(--text); word-break: break-word;
+  }
+  .env-value a { color: var(--accent); text-decoration: none; }
+
+  .env-sender-line {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .env-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--accent); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; flex-shrink: 0;
+  }
+  .env-sender-info { flex: 1; }
+  .env-sender-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .env-sender-email { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+  .env-date {
+    font-size: 12px; color: var(--text-dim); white-space: nowrap;
+    align-self: flex-start; padding-top: 2px;
+  }
+
+  .env-recipients {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  /* ── Tabs ── */
+  .env-tabs {
+    display: flex; background: var(--surface-alt);
+    border-bottom: 1px solid var(--border-light);
+    padding: 0 28px;
+  }
+  .env-tab {
+    padding: 11px 18px; font-size: 13px; font-weight: 500;
+    color: var(--text-secondary); cursor: pointer; border: none;
+    background: none; font-family: var(--font); position: relative;
+    transition: color 0.15s;
+  }
+  .env-tab:hover { color: var(--text); }
+  .env-tab.active { color: var(--accent); font-weight: 600; }
+  .env-tab.active::after {
+    content: ''; position: absolute; bottom: 0; left: 18px; right: 18px;
+    height: 2px; background: var(--accent); border-radius: 1px 1px 0 0;
+  }
+  .env-tab .tbadge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; border-radius: 9px;
+    background: var(--accent-soft2); color: var(--accent);
+    font-size: 11px; font-weight: 600; margin-left: 6px; padding: 0 5px;
+  }
+
+  /* ── Tab Panels ── */
+  .env-panel { display: none; }
+  .env-panel.active { display: block; }
+
+  /* Body */
+  .env-body {
+    padding: 28px 32px;
+    font-size: 14px; line-height: 1.7;
+    color: var(--text);
+    overflow-y: auto;
+    max-height: 70vh;
+  }
+  .env-body::-webkit-scrollbar { width: 5px; }
+  .env-body::-webkit-scrollbar-track { background: transparent; }
+  .env-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .env-body-html iframe {
+    width: 100%; min-height: 400px; border: none;
+    display: block;
+  }
+
+  .env-body-text .para { margin-bottom: 14px; }
+  .env-body-text .para:last-child { margin-bottom: 0; }
+
+  .env-body-text .sig-block {
+    margin-top: 20px; padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+    color: var(--text-secondary); font-size: 13px; line-height: 1.6;
+  }
+  .env-body-text .disclaimer-block {
+    margin-top: 24px; padding: 14px 18px;
+    background: var(--surface-alt); border-left: 3px solid var(--border);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 11.5px; line-height: 1.65; color: var(--text-dim);
+  }
+
+  /* Attachments */
+  .env-attach { padding: 20px 28px; }
+  .att-card {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px; background: var(--surface-alt);
+    border: 1px solid var(--border-light); border-radius: var(--radius-sm);
+    margin-bottom: 8px; transition: all 0.15s;
+  }
+  .att-card:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .att-icon {
+    width: 40px; height: 40px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; flex-shrink: 0;
+  }
+  .att-icon.pdf { background: #fde8e8; color: #c42b1c; }
+  .att-icon.img { background: #dff6dd; color: #107c10; }
+  .att-icon.doc { background: #e8f0fe; color: #185abd; }
+  .att-icon.xls { background: #dff6dd; color: #107c10; }
+  .att-icon.zip { background: #fff4ce; color: #8a6914; }
+  .att-icon.other { background: #f0f0f0; color: #605e5c; }
+  .att-info { flex: 1; min-width: 0; }
+  .att-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .att-size { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .att-btn {
+    padding: 6px 14px; background: var(--accent); color: white;
+    border: none; border-radius: var(--radius-sm); font-size: 12px;
+    font-weight: 500; cursor: pointer; font-family: var(--font);
+    transition: background 0.15s; white-space: nowrap;
+  }
+  .att-btn:hover { background: var(--accent-hover); }
+
+  .att-preview { margin-top: 8px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-light); }
+  .att-preview img { max-width: 100%; display: block; max-height: 300px; object-fit: contain; background: #fafafa; }
+
+  .no-att {
+    text-align: center; padding: 40px 20px; color: var(--text-dim);
+  }
+  .no-att svg { margin-bottom: 8px; opacity: 0.35; }
+  .no-att p { font-size: 13px; }
+
+  /* Headers */
+  .env-headers {
+    padding: 20px 28px;
+    font-family: 'Cascadia Code', 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 11.5px; line-height: 1.7; color: var(--text-secondary);
+    white-space: pre-wrap; word-break: break-all;
+    max-height: 50vh; overflow-y: auto;
+  }
+  .env-headers .h-key { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="app-header">
+    <div class="app-logo">M</div>
+    <div class="app-title">MSG Viewer<span>Outlook Mail Okuyucu</span></div>
+  </div>
+
+  <div class="dropzone-wrap" id="dropSection">
+    <div class="dropzone" id="dropzone">
+      <div class="dz-icon">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+      </div>
+      <h3>.msg dosyanızı sürükleyin veya tıklayın</h3>
+      <p>Birden fazla dosya da seçebilirsiniz</p>
+      <input type="file" id="fileInput" accept=".msg" multiple>
+    </div>
+    <div class="error-toast" id="errorBox"></div>
+    <div class="file-list" id="fileList"></div>
+  </div>
+
+  <div class="email-view" id="emailView">
+    <button class="btn-back" id="backBtn">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+      Geri
+    </button>
+    <div class="envelope" id="envelope"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  var __create = Object.create;
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getProtoOf = Object.getPrototypeOf;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __commonJS = (cb, mod) => function __require() {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    mod
+  ));
+
+  // node_modules/msgreader/lib/utils.js
+  var require_utils = __commonJS({
+    "node_modules/msgreader/lib/utils.js"(exports) {
+      "use strict";
+      Object.defineProperty(exports, "__esModule", {
+        value: true
+      });
+      exports.arraysEqual = arraysEqual;
+      exports.uInt2int = uInt2int;
+      function arraysEqual(a, b) {
+        if (a === b) return true;
+        if (a == null || b == null) return false;
+        if (a.length != b.length) return false;
+        for (var i = 0; i < a.length; i++) {
+          if (a[i] !== b[i]) return false;
+        }
+        return true;
+      }
+      function uInt2int(data) {
+        var result = new Array(data.length);
+        for (var i = 0; i < data.length; i++) {
+          result[i] = data[i] << 24 >> 24;
+        }
+        return result;
+      }
+    }
+  });
+
+  // node_modules/msgreader/lib/const.js
+  var require_const = __commonJS({
+    "node_modules/msgreader/lib/const.js"(exports) {
+      "use strict";
+      Object.defineProperty(exports, "__esModule", {
+        value: true
+      });
+      var _utils = require_utils();
+      exports.default = {
+        FILE_HEADER: (0, _utils.uInt2int)([208, 207, 17, 224, 161, 177, 26, 225]),
+        MSG: {
+          UNUSED_BLOCK: -1,
+          END_OF_CHAIN: -2,
+          S_BIG_BLOCK_SIZE: 512,
+          S_BIG_BLOCK_MARK: 9,
+          L_BIG_BLOCK_SIZE: 4096,
+          L_BIG_BLOCK_MARK: 12,
+          SMALL_BLOCK_SIZE: 64,
+          BIG_BLOCK_MIN_DOC_SIZE: 4096,
+          HEADER: {
+            PROPERTY_START_OFFSET: 48,
+            BAT_START_OFFSET: 76,
+            BAT_COUNT_OFFSET: 44,
+            SBAT_START_OFFSET: 60,
+            SBAT_COUNT_OFFSET: 64,
+            XBAT_START_OFFSET: 68,
+            XBAT_COUNT_OFFSET: 72
+          },
+          PROP: {
+            NO_INDEX: -1,
+            PROPERTY_SIZE: 128,
+            NAME_SIZE_OFFSET: 64,
+            MAX_NAME_LENGTH: (
+              /*NAME_SIZE_OFFSET*/
+              64 / 2 - 1
+            ),
+            TYPE_OFFSET: 66,
+            PREVIOUS_PROPERTY_OFFSET: 68,
+            NEXT_PROPERTY_OFFSET: 72,
+            CHILD_PROPERTY_OFFSET: 76,
+            START_BLOCK_OFFSET: 116,
+            SIZE_OFFSET: 120,
+            TYPE_ENUM: {
+              DIRECTORY: 1,
+              DOCUMENT: 2,
+              ROOT: 5
+            }
+          },
+          FIELD: {
+            PREFIX: {
+              ATTACHMENT: "__attach_version1.0",
+              RECIPIENT: "__recip_version1.0",
+              DOCUMENT: "__substg1."
+            },
+            // example (use fields as needed)
+            NAME_MAPPING: {
+              // email specific
+              "0037": "subject",
+              "0c1a": "senderName",
+              "0c1f": "senderSmtp",
+              "5d02": "senderEmail",
+              "1000": "body",
+              "1013": "bodyHtml",
+              "007d": "headers",
+              "0e04": "displayTo",
+              "0e03": "displayCc",
+              "0e05": "displayBcc",
+              "0070": "conversationTopic",
+              "0039": "sentDate",
+              "3007": "creationDate",
+              // attachment specific
+              "3703": "extension",
+              "3704": "fileNameShort",
+              "3707": "fileName",
+              "3712": "pidContentId",
+              "370e": "mimeType",
+              // recipient specific
+              "3001": "name",
+              "39fe": "email",
+              "3002": "recipType"
+            },
+            CLASS_MAPPING: {
+              ATTACHMENT_DATA: "3701"
+            },
+            TYPE_MAPPING: {
+              "001e": "string",
+              "001f": "unicode",
+              "0102": "binary"
+            },
+            DIR_TYPE: {
+              INNER_MSG: "000d"
+            }
+          }
+        }
+      };
+    }
+  });
+
+  // node_modules/msgreader/lib/DataStream.js
+  var require_DataStream = __commonJS({
+    "node_modules/msgreader/lib/DataStream.js"(exports, module) {
+      "use strict";
+      var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function(obj) {
+        return typeof obj;
+      } : function(obj) {
+        return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+      };
+      var DataStream = function DataStream2(arrayBuffer, byteOffset, endianness) {
+        this._byteOffset = byteOffset || 0;
+        if (arrayBuffer instanceof ArrayBuffer) {
+          this.buffer = arrayBuffer;
+        } else if ((typeof arrayBuffer === "undefined" ? "undefined" : _typeof(arrayBuffer)) == "object") {
+          this.dataView = arrayBuffer;
+          if (byteOffset) {
+            this._byteOffset += byteOffset;
+          }
+        } else {
+          this.buffer = new ArrayBuffer(arrayBuffer || 1);
+        }
+        this.position = 0;
+        this.endianness = endianness == null ? DataStream2.LITTLE_ENDIAN : endianness;
+      };
+      DataStream.prototype = {};
+      if (Uint8Array.prototype.BYTES_PER_ELEMENT === void 0) {
+        Uint8Array.prototype.BYTES_PER_ELEMENT = Uint8Array.BYTES_PER_ELEMENT;
+        Int8Array.prototype.BYTES_PER_ELEMENT = Int8Array.BYTES_PER_ELEMENT;
+        Uint8ClampedArray.prototype.BYTES_PER_ELEMENT = Uint8ClampedArray.BYTES_PER_ELEMENT;
+        Uint16Array.prototype.BYTES_PER_ELEMENT = Uint16Array.BYTES_PER_ELEMENT;
+        Int16Array.prototype.BYTES_PER_ELEMENT = Int16Array.BYTES_PER_ELEMENT;
+        Uint32Array.prototype.BYTES_PER_ELEMENT = Uint32Array.BYTES_PER_ELEMENT;
+        Int32Array.prototype.BYTES_PER_ELEMENT = Int32Array.BYTES_PER_ELEMENT;
+        Float64Array.prototype.BYTES_PER_ELEMENT = Float64Array.BYTES_PER_ELEMENT;
+      }
+      DataStream.prototype.save = function(filename) {
+        var blob = new Blob(this.buffer);
+        var URL = window.webkitURL || window.URL;
+        if (URL && URL.createObjectURL) {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.setAttribute("href", url);
+          a.setAttribute("download", filename);
+          a.click();
+          URL.revokeObjectURL(url);
+        } else {
+          throw "DataStream.save: Can't create object URL.";
+        }
+      };
+      DataStream.BIG_ENDIAN = false;
+      DataStream.LITTLE_ENDIAN = true;
+      DataStream.prototype._dynamicSize = true;
+      Object.defineProperty(DataStream.prototype, "dynamicSize", {
+        get: function get() {
+          return this._dynamicSize;
+        },
+        set: function set(v) {
+          if (!v) {
+            this._trimAlloc();
+          }
+          this._dynamicSize = v;
+        }
+      });
+      DataStream.prototype._byteLength = 0;
+      Object.defineProperty(DataStream.prototype, "byteLength", { get: function get() {
+        return this._byteLength - this._byteOffset;
+      } });
+      Object.defineProperty(DataStream.prototype, "buffer", {
+        get: function get() {
+          this._trimAlloc();
+          return this._buffer;
+        },
+        set: function set(v) {
+          this._buffer = v;
+          this._dataView = new DataView(this._buffer, this._byteOffset);
+          this._byteLength = this._buffer.byteLength;
+        }
+      });
+      Object.defineProperty(DataStream.prototype, "byteOffset", {
+        get: function get() {
+          return this._byteOffset;
+        },
+        set: function set(v) {
+          this._byteOffset = v;
+          this._dataView = new DataView(this._buffer, this._byteOffset);
+          this._byteLength = this._buffer.byteLength;
+        }
+      });
+      Object.defineProperty(DataStream.prototype, "dataView", {
+        get: function get() {
+          return this._dataView;
+        },
+        set: function set(v) {
+          this._byteOffset = v.byteOffset;
+          this._buffer = v.buffer;
+          this._dataView = new DataView(this._buffer, this._byteOffset);
+          this._byteLength = this._byteOffset + v.byteLength;
+        }
+      });
+      DataStream.prototype._realloc = function(extra) {
+        if (!this._dynamicSize) {
+          return;
+        }
+        var req = this._byteOffset + this.position + extra;
+        var blen = this._buffer.byteLength;
+        if (req <= blen) {
+          if (req > this._byteLength) {
+            this._byteLength = req;
+          }
+          return;
+        }
+        if (blen < 1) {
+          blen = 1;
+        }
+        while (req > blen) {
+          blen *= 2;
+        }
+        var buf = new ArrayBuffer(blen);
+        var src = new Uint8Array(this._buffer);
+        var dst = new Uint8Array(buf, 0, src.length);
+        dst.set(src);
+        this.buffer = buf;
+        this._byteLength = req;
+      };
+      DataStream.prototype._trimAlloc = function() {
+        if (this._byteLength == this._buffer.byteLength) {
+          return;
+        }
+        var buf = new ArrayBuffer(this._byteLength);
+        var dst = new Uint8Array(buf);
+        var src = new Uint8Array(this._buffer, 0, dst.length);
+        dst.set(src);
+        this.buffer = buf;
+      };
+      DataStream.prototype.seek = function(pos) {
+        var npos = Math.max(0, Math.min(this.byteLength, pos));
+        this.position = isNaN(npos) || !isFinite(npos) ? 0 : npos;
+      };
+      DataStream.prototype.isEof = function() {
+        return this.position >= this.byteLength;
+      };
+      DataStream.prototype.mapInt32Array = function(length, e) {
+        this._realloc(length * 4);
+        var arr = new Int32Array(this._buffer, this.byteOffset + this.position, length);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += length * 4;
+        return arr;
+      };
+      DataStream.prototype.mapInt16Array = function(length, e) {
+        this._realloc(length * 2);
+        var arr = new Int16Array(this._buffer, this.byteOffset + this.position, length);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += length * 2;
+        return arr;
+      };
+      DataStream.prototype.mapInt8Array = function(length) {
+        this._realloc(length * 1);
+        var arr = new Int8Array(this._buffer, this.byteOffset + this.position, length);
+        this.position += length * 1;
+        return arr;
+      };
+      DataStream.prototype.mapUint32Array = function(length, e) {
+        this._realloc(length * 4);
+        var arr = new Uint32Array(this._buffer, this.byteOffset + this.position, length);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += length * 4;
+        return arr;
+      };
+      DataStream.prototype.mapUint16Array = function(length, e) {
+        this._realloc(length * 2);
+        var arr = new Uint16Array(this._buffer, this.byteOffset + this.position, length);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += length * 2;
+        return arr;
+      };
+      DataStream.prototype.mapUint8Array = function(length) {
+        this._realloc(length * 1);
+        var arr = new Uint8Array(this._buffer, this.byteOffset + this.position, length);
+        this.position += length * 1;
+        return arr;
+      };
+      DataStream.prototype.mapFloat64Array = function(length, e) {
+        this._realloc(length * 8);
+        var arr = new Float64Array(this._buffer, this.byteOffset + this.position, length);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += length * 8;
+        return arr;
+      };
+      DataStream.prototype.mapFloat32Array = function(length, e) {
+        this._realloc(length * 4);
+        var arr = new Float32Array(this._buffer, this.byteOffset + this.position, length);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += length * 4;
+        return arr;
+      };
+      DataStream.prototype.readInt32Array = function(length, e) {
+        length = length == null ? this.byteLength - this.position / 4 : length;
+        var arr = new Int32Array(length);
+        DataStream.memcpy(arr.buffer, 0, this.buffer, this.byteOffset + this.position, length * arr.BYTES_PER_ELEMENT);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += arr.byteLength;
+        return arr;
+      };
+      DataStream.prototype.readInt16Array = function(length, e) {
+        length = length == null ? this.byteLength - this.position / 2 : length;
+        var arr = new Int16Array(length);
+        DataStream.memcpy(arr.buffer, 0, this.buffer, this.byteOffset + this.position, length * arr.BYTES_PER_ELEMENT);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += arr.byteLength;
+        return arr;
+      };
+      DataStream.prototype.readInt8Array = function(length) {
+        length = length == null ? this.byteLength - this.position : length;
+        var arr = new Int8Array(length);
+        DataStream.memcpy(arr.buffer, 0, this.buffer, this.byteOffset + this.position, length * arr.BYTES_PER_ELEMENT);
+        this.position += arr.byteLength;
+        return arr;
+      };
+      DataStream.prototype.readUint32Array = function(length, e) {
+        length = length == null ? this.byteLength - this.position / 4 : length;
+        var arr = new Uint32Array(length);
+        DataStream.memcpy(arr.buffer, 0, this.buffer, this.byteOffset + this.position, length * arr.BYTES_PER_ELEMENT);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += arr.byteLength;
+        return arr;
+      };
+      DataStream.prototype.readUint16Array = function(length, e) {
+        length = length == null ? this.byteLength - this.position / 2 : length;
+        var arr = new Uint16Array(length);
+        DataStream.memcpy(arr.buffer, 0, this.buffer, this.byteOffset + this.position, length * arr.BYTES_PER_ELEMENT);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += arr.byteLength;
+        return arr;
+      };
+      DataStream.prototype.readUint8Array = function(length) {
+        length = length == null ? this.byteLength - this.position : length;
+        var arr = new Uint8Array(length);
+        DataStream.memcpy(arr.buffer, 0, this.buffer, this.byteOffset + this.position, length * arr.BYTES_PER_ELEMENT);
+        this.position += arr.byteLength;
+        return arr;
+      };
+      DataStream.prototype.readFloat64Array = function(length, e) {
+        length = length == null ? this.byteLength - this.position / 8 : length;
+        var arr = new Float64Array(length);
+        DataStream.memcpy(arr.buffer, 0, this.buffer, this.byteOffset + this.position, length * arr.BYTES_PER_ELEMENT);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += arr.byteLength;
+        return arr;
+      };
+      DataStream.prototype.readFloat32Array = function(length, e) {
+        length = length == null ? this.byteLength - this.position / 4 : length;
+        var arr = new Float32Array(length);
+        DataStream.memcpy(arr.buffer, 0, this.buffer, this.byteOffset + this.position, length * arr.BYTES_PER_ELEMENT);
+        DataStream.arrayToNative(arr, e == null ? this.endianness : e);
+        this.position += arr.byteLength;
+        return arr;
+      };
+      DataStream.prototype.writeInt32Array = function(arr, e) {
+        this._realloc(arr.length * 4);
+        if (arr instanceof Int32Array && this.byteOffset + this.position % arr.BYTES_PER_ELEMENT == 0) {
+          DataStream.memcpy(this._buffer, this.byteOffset + this.position, arr.buffer, 0, arr.byteLength);
+          this.mapInt32Array(arr.length, e);
+        } else {
+          for (var i = 0; i < arr.length; i++) {
+            this.writeInt32(arr[i], e);
+          }
+        }
+      };
+      DataStream.prototype.writeInt16Array = function(arr, e) {
+        this._realloc(arr.length * 2);
+        if (arr instanceof Int16Array && this.byteOffset + this.position % arr.BYTES_PER_ELEMENT == 0) {
+          DataStream.memcpy(this._buffer, this.byteOffset + this.position, arr.buffer, 0, arr.byteLength);
+          this.mapInt16Array(arr.length, e);
+        } else {
+          for (var i = 0; i < arr.length; i++) {
+            this.writeInt16(arr[i], e);
+          }
+        }
+      };
+      DataStream.prototype.writeInt8Array = function(arr) {
+        this._realloc(arr.length * 1);
+        if (arr instanceof Int8Array && this.byteOffset + this.position % arr.BYTES_PER_ELEMENT == 0) {
+          DataStream.memcpy(this._buffer, this.byteOffset + this.position, arr.buffer, 0, arr.byteLength);
+          this.mapInt8Array(arr.length);
+        } else {
+          for (var i = 0; i < arr.length; i++) {
+            this.writeInt8(arr[i]);
+          }
+        }
+      };
+      DataStream.prototype.writeUint32Array = function(arr, e) {
+        this._realloc(arr.length * 4);
+        if (arr instanceof Uint32Array && this.byteOffset + this.position % arr.BYTES_PER_ELEMENT == 0) {
+          DataStream.memcpy(this._buffer, this.byteOffset + this.position, arr.buffer, 0, arr.byteLength);
+          this.mapUint32Array(arr.length, e);
+        } else {
+          for (var i = 0; i < arr.length; i++) {
+            this.writeUint32(arr[i], e);
+          }
+        }
+      };
+      DataStream.prototype.writeUint16Array = function(arr, e) {
+        this._realloc(arr.length * 2);
+        if (arr instanceof Uint16Array && this.byteOffset + this.position % arr.BYTES_PER_ELEMENT == 0) {
+          DataStream.memcpy(this._buffer, this.byteOffset + this.position, arr.buffer, 0, arr.byteLength);
+          this.mapUint16Array(arr.length, e);
+        } else {
+          for (var i = 0; i < arr.length; i++) {
+            this.writeUint16(arr[i], e);
+          }
+        }
+      };
+      DataStream.prototype.writeUint8Array = function(arr) {
+        this._realloc(arr.length * 1);
+        if (arr instanceof Uint8Array && this.byteOffset + this.position % arr.BYTES_PER_ELEMENT == 0) {
+          DataStream.memcpy(this._buffer, this.byteOffset + this.position, arr.buffer, 0, arr.byteLength);
+          this.mapUint8Array(arr.length);
+        } else {
+          for (var i = 0; i < arr.length; i++) {
+            this.writeUint8(arr[i]);
+          }
+        }
+      };
+      DataStream.prototype.writeFloat64Array = function(arr, e) {
+        this._realloc(arr.length * 8);
+        if (arr instanceof Float64Array && this.byteOffset + this.position % arr.BYTES_PER_ELEMENT == 0) {
+          DataStream.memcpy(this._buffer, this.byteOffset + this.position, arr.buffer, 0, arr.byteLength);
+          this.mapFloat64Array(arr.length, e);
+        } else {
+          for (var i = 0; i < arr.length; i++) {
+            this.writeFloat64(arr[i], e);
+          }
+        }
+      };
+      DataStream.prototype.writeFloat32Array = function(arr, e) {
+        this._realloc(arr.length * 4);
+        if (arr instanceof Float32Array && this.byteOffset + this.position % arr.BYTES_PER_ELEMENT == 0) {
+          DataStream.memcpy(this._buffer, this.byteOffset + this.position, arr.buffer, 0, arr.byteLength);
+          this.mapFloat32Array(arr.length, e);
+        } else {
+          for (var i = 0; i < arr.length; i++) {
+            this.writeFloat32(arr[i], e);
+          }
+        }
+      };
+      DataStream.prototype.readInt32 = function(e) {
+        var v = this._dataView.getInt32(this.position, e == null ? this.endianness : e);
+        this.position += 4;
+        return v;
+      };
+      DataStream.prototype.readInt = function(offset) {
+        this.seek(offset);
+        return this.readInt32();
+      };
+      DataStream.prototype.readInt16 = function(e) {
+        var v = this._dataView.getInt16(this.position, e == null ? this.endianness : e);
+        this.position += 2;
+        return v;
+      };
+      DataStream.prototype.readShort = function(offset) {
+        this.seek(offset);
+        return this.readInt16();
+      };
+      DataStream.prototype.readInt8 = function() {
+        var v = this._dataView.getInt8(this.position);
+        this.position += 1;
+        return v;
+      };
+      DataStream.prototype.readByte = function(offset) {
+        this.seek(offset);
+        return this.readInt8();
+      };
+      DataStream.prototype.readUint32 = function(e) {
+        var v = this._dataView.getUint32(this.position, e == null ? this.endianness : e);
+        this.position += 4;
+        return v;
+      };
+      DataStream.prototype.readUint16 = function(e) {
+        var v = this._dataView.getUint16(this.position, e == null ? this.endianness : e);
+        this.position += 2;
+        return v;
+      };
+      DataStream.prototype.readUint8 = function() {
+        var v = this._dataView.getUint8(this.position);
+        this.position += 1;
+        return v;
+      };
+      DataStream.prototype.readFloat32 = function(e) {
+        var v = this._dataView.getFloat32(this.position, e == null ? this.endianness : e);
+        this.position += 4;
+        return v;
+      };
+      DataStream.prototype.readFloat64 = function(e) {
+        var v = this._dataView.getFloat64(this.position, e == null ? this.endianness : e);
+        this.position += 8;
+        return v;
+      };
+      DataStream.prototype.writeInt32 = function(v, e) {
+        this._realloc(4);
+        this._dataView.setInt32(this.position, v, e == null ? this.endianness : e);
+        this.position += 4;
+      };
+      DataStream.prototype.writeInt16 = function(v, e) {
+        this._realloc(2);
+        this._dataView.setInt16(this.position, v, e == null ? this.endianness : e);
+        this.position += 2;
+      };
+      DataStream.prototype.writeInt8 = function(v) {
+        this._realloc(1);
+        this._dataView.setInt8(this.position, v);
+        this.position += 1;
+      };
+      DataStream.prototype.writeUint32 = function(v, e) {
+        this._realloc(4);
+        this._dataView.setUint32(this.position, v, e == null ? this.endianness : e);
+        this.position += 4;
+      };
+      DataStream.prototype.writeUint16 = function(v, e) {
+        this._realloc(2);
+        this._dataView.setUint16(this.position, v, e == null ? this.endianness : e);
+        this.position += 2;
+      };
+      DataStream.prototype.writeUint8 = function(v) {
+        this._realloc(1);
+        this._dataView.setUint8(this.position, v);
+        this.position += 1;
+      };
+      DataStream.prototype.writeFloat32 = function(v, e) {
+        this._realloc(4);
+        this._dataView.setFloat32(this.position, v, e == null ? this.endianness : e);
+        this.position += 4;
+      };
+      DataStream.prototype.writeFloat64 = function(v, e) {
+        this._realloc(8);
+        this._dataView.setFloat64(this.position, v, e == null ? this.endianness : e);
+        this.position += 8;
+      };
+      DataStream.endianness = new Int8Array(new Int16Array([1]).buffer)[0] > 0;
+      DataStream.memcpy = function(dst, dstOffset, src, srcOffset, byteLength) {
+        var dstU8 = new Uint8Array(dst, dstOffset, byteLength);
+        var srcU8 = new Uint8Array(src, srcOffset, byteLength);
+        dstU8.set(srcU8);
+      };
+      DataStream.arrayToNative = function(array, arrayIsLittleEndian) {
+        if (arrayIsLittleEndian == this.endianness) {
+          return array;
+        } else {
+          return this.flipArrayEndianness(array);
+        }
+      };
+      DataStream.nativeToEndian = function(array, littleEndian) {
+        if (this.endianness == littleEndian) {
+          return array;
+        } else {
+          return this.flipArrayEndianness(array);
+        }
+      };
+      DataStream.flipArrayEndianness = function(array) {
+        var u8 = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+        for (var i = 0; i < array.byteLength; i += array.BYTES_PER_ELEMENT) {
+          for (var j = i + array.BYTES_PER_ELEMENT - 1, k = i; j > k; j--, k++) {
+            var tmp = u8[k];
+            u8[k] = u8[j];
+            u8[j] = tmp;
+          }
+        }
+        return array;
+      };
+      DataStream.createStringFromArray = function(array) {
+        var str = "";
+        for (var i = 0; i < array.length; i++) {
+          str += String.fromCharCode(array[i]);
+        }
+        return str;
+      };
+      DataStream.prototype.failurePosition = 0;
+      DataStream.prototype.readStruct = function(structDefinition) {
+        var struct = {}, t, v, n;
+        var p = this.position;
+        for (var i = 0; i < structDefinition.length; i += 2) {
+          t = structDefinition[i + 1];
+          v = this.readType(t, struct);
+          if (v == null) {
+            if (this.failurePosition == 0) {
+              this.failurePosition = this.position;
+            }
+            this.position = p;
+            return null;
+          }
+          struct[structDefinition[i]] = v;
+        }
+        return struct;
+      };
+      DataStream.prototype.readUCS2String = function(length, endianness) {
+        return DataStream.createStringFromArray(this.readUint16Array(length, endianness));
+      };
+      DataStream.prototype.readStringAt = function(offset, length) {
+        this.seek(offset);
+        return this.readUCS2String(length);
+      };
+      DataStream.prototype.writeUCS2String = function(str, endianness, lengthOverride) {
+        if (lengthOverride == null) {
+          lengthOverride = str.length;
+        }
+        for (var i = 0; i < str.length && i < lengthOverride; i++) {
+          this.writeUint16(str.charCodeAt(i), endianness);
+        }
+        for (; i < lengthOverride; i++) {
+          this.writeUint16(0);
+        }
+      };
+      DataStream.prototype.readString = function(length, encoding) {
+        if (encoding == null || encoding == "ASCII") {
+          return DataStream.createStringFromArray(this.mapUint8Array(length == null ? this.byteLength - this.position : length));
+        } else {
+          return new TextDecoder(encoding).decode(this.mapUint8Array(length));
+        }
+      };
+      DataStream.prototype.writeString = function(s, encoding, length) {
+        if (encoding == null || encoding == "ASCII") {
+          if (length != null) {
+            var i = 0;
+            var len = Math.min(s.length, length);
+            for (i = 0; i < len; i++) {
+              this.writeUint8(s.charCodeAt(i));
+            }
+            for (; i < length; i++) {
+              this.writeUint8(0);
+            }
+          } else {
+            for (var i = 0; i < s.length; i++) {
+              this.writeUint8(s.charCodeAt(i));
+            }
+          }
+        } else {
+          this.writeUint8Array(new TextEncoder(encoding).encode(s.substring(0, length)));
+        }
+      };
+      DataStream.prototype.readCString = function(length) {
+        var blen = this.byteLength - this.position;
+        var u8 = new Uint8Array(this._buffer, this._byteOffset + this.position);
+        var len = blen;
+        if (length != null) {
+          len = Math.min(length, blen);
+        }
+        for (var i = 0; i < len && u8[i] != 0; i++) {
+        }
+        var s = DataStream.createStringFromArray(this.mapUint8Array(i));
+        if (length != null) {
+          this.position += len - i;
+        } else if (i != blen) {
+          this.position += 1;
+        }
+        return s;
+      };
+      DataStream.prototype.writeCString = function(s, length) {
+        if (length != null) {
+          var i = 0;
+          var len = Math.min(s.length, length);
+          for (i = 0; i < len; i++) {
+            this.writeUint8(s.charCodeAt(i));
+          }
+          for (; i < length; i++) {
+            this.writeUint8(0);
+          }
+        } else {
+          for (var i = 0; i < s.length; i++) {
+            this.writeUint8(s.charCodeAt(i));
+          }
+          this.writeUint8(0);
+        }
+      };
+      DataStream.prototype.readType = function(t, struct) {
+        if (typeof t == "function") {
+          return t(this, struct);
+        } else if ((typeof t === "undefined" ? "undefined" : _typeof(t)) == "object" && !(t instanceof Array)) {
+          return t.get(this, struct);
+        } else if (t instanceof Array && t.length != 3) {
+          return this.readStruct(t, struct);
+        }
+        var v = null;
+        var lengthOverride = null;
+        var charset = "ASCII";
+        var pos = this.position;
+        var len;
+        if (typeof t == "string" && /:/.test(t)) {
+          var tp = t.split(":");
+          t = tp[0];
+          len = tp[1];
+          if (struct[len] != null) {
+            lengthOverride = parseInt(struct[len]);
+          } else {
+            lengthOverride = parseInt(tp[1]);
+          }
+        }
+        if (typeof t == "string" && /,/.test(t)) {
+          var tp = t.split(",");
+          t = tp[0];
+          charset = parseInt(tp[1]);
+        }
+        switch (t) {
+          case "uint8":
+            v = this.readUint8();
+            break;
+          case "int8":
+            v = this.readInt8();
+            break;
+          case "uint16":
+            v = this.readUint16(this.endianness);
+            break;
+          case "int16":
+            v = this.readInt16(this.endianness);
+            break;
+          case "uint32":
+            v = this.readUint32(this.endianness);
+            break;
+          case "int32":
+            v = this.readInt32(this.endianness);
+            break;
+          case "float32":
+            v = this.readFloat32(this.endianness);
+            break;
+          case "float64":
+            v = this.readFloat64(this.endianness);
+            break;
+          case "uint16be":
+            v = this.readUint16(DataStream.BIG_ENDIAN);
+            break;
+          case "int16be":
+            v = this.readInt16(DataStream.BIG_ENDIAN);
+            break;
+          case "uint32be":
+            v = this.readUint32(DataStream.BIG_ENDIAN);
+            break;
+          case "int32be":
+            v = this.readInt32(DataStream.BIG_ENDIAN);
+            break;
+          case "float32be":
+            v = this.readFloat32(DataStream.BIG_ENDIAN);
+            break;
+          case "float64be":
+            v = this.readFloat64(DataStream.BIG_ENDIAN);
+            break;
+          case "uint16le":
+            v = this.readUint16(DataStream.LITTLE_ENDIAN);
+            break;
+          case "int16le":
+            v = this.readInt16(DataStream.LITTLE_ENDIAN);
+            break;
+          case "uint32le":
+            v = this.readUint32(DataStream.LITTLE_ENDIAN);
+            break;
+          case "int32le":
+            v = this.readInt32(DataStream.LITTLE_ENDIAN);
+            break;
+          case "float32le":
+            v = this.readFloat32(DataStream.LITTLE_ENDIAN);
+            break;
+          case "float64le":
+            v = this.readFloat64(DataStream.LITTLE_ENDIAN);
+            break;
+          case "cstring":
+            v = this.readCString(lengthOverride);
+            break;
+          case "string":
+            v = this.readString(lengthOverride, charset);
+            break;
+          case "u16string":
+            v = this.readUCS2String(lengthOverride, this.endianness);
+            break;
+          case "u16stringle":
+            v = this.readUCS2String(lengthOverride, DataStream.LITTLE_ENDIAN);
+            break;
+          case "u16stringbe":
+            v = this.readUCS2String(lengthOverride, DataStream.BIG_ENDIAN);
+            break;
+          default:
+            if (t.length == 3) {
+              var ta = t[1];
+              var len = t[2];
+              var length = 0;
+              if (typeof len == "function") {
+                length = len(struct, this, t);
+              } else if (typeof len == "string" && struct[len] != null) {
+                length = parseInt(struct[len]);
+              } else {
+                length = parseInt(len);
+              }
+              if (typeof ta == "string") {
+                var tap = ta.replace(/(le|be)$/, "");
+                var endianness = null;
+                if (/le$/.test(ta)) {
+                  endianness = DataStream.LITTLE_ENDIAN;
+                } else if (/be$/.test(ta)) {
+                  endianness = DataStream.BIG_ENDIAN;
+                }
+                if (len == "*") {
+                  length = null;
+                }
+                switch (tap) {
+                  case "uint8":
+                    v = this.readUint8Array(length);
+                    break;
+                  case "uint16":
+                    v = this.readUint16Array(length, endianness);
+                    break;
+                  case "uint32":
+                    v = this.readUint32Array(length, endianness);
+                    break;
+                  case "int8":
+                    v = this.readInt8Array(length);
+                    break;
+                  case "int16":
+                    v = this.readInt16Array(length, endianness);
+                    break;
+                  case "int32":
+                    v = this.readInt32Array(length, endianness);
+                    break;
+                  case "float32":
+                    v = this.readFloat32Array(length, endianness);
+                    break;
+                  case "float64":
+                    v = this.readFloat64Array(length, endianness);
+                    break;
+                  case "cstring":
+                  case "utf16string":
+                  case "string":
+                    if (length == null) {
+                      v = [];
+                      while (!this.isEof()) {
+                        var u = this.readType(ta, struct);
+                        if (u == null) break;
+                        v.push(u);
+                      }
+                    } else {
+                      v = new Array(length);
+                      for (var i = 0; i < length; i++) {
+                        v[i] = this.readType(ta, struct);
+                      }
+                    }
+                    break;
+                }
+              } else {
+                if (len == "*") {
+                  v = [];
+                  this.buffer;
+                  while (true) {
+                    var p = this.position;
+                    try {
+                      var o = this.readType(ta, struct);
+                      if (o == null) {
+                        this.position = p;
+                        break;
+                      }
+                      v.push(o);
+                    } catch (e) {
+                      this.position = p;
+                      break;
+                    }
+                  }
+                } else {
+                  v = new Array(length);
+                  for (var i = 0; i < length; i++) {
+                    var u = this.readType(ta, struct);
+                    if (u == null) return null;
+                    v[i] = u;
+                  }
+                }
+              }
+              break;
+            }
+        }
+        if (lengthOverride != null) {
+          this.position = pos + lengthOverride;
+        }
+        return v;
+      };
+      DataStream.prototype.writeStruct = function(structDefinition, struct) {
+        for (var i = 0; i < structDefinition.length; i += 2) {
+          var t = structDefinition[i + 1];
+          this.writeType(t, struct[structDefinition[i]], struct);
+        }
+      };
+      DataStream.prototype.writeType = function(t, v, struct) {
+        if (typeof t == "function") {
+          return t(this, v);
+        } else if ((typeof t === "undefined" ? "undefined" : _typeof(t)) == "object" && !(t instanceof Array)) {
+          return t.set(this, v, struct);
+        }
+        var lengthOverride = null;
+        var charset = "ASCII";
+        var pos = this.position;
+        if (typeof t == "string" && /:/.test(t)) {
+          var tp = t.split(":");
+          t = tp[0];
+          lengthOverride = parseInt(tp[1]);
+        }
+        if (typeof t == "string" && /,/.test(t)) {
+          var tp = t.split(",");
+          t = tp[0];
+          charset = parseInt(tp[1]);
+        }
+        switch (t) {
+          case "uint8":
+            this.writeUint8(v);
+            break;
+          case "int8":
+            this.writeInt8(v);
+            break;
+          case "uint16":
+            this.writeUint16(v, this.endianness);
+            break;
+          case "int16":
+            this.writeInt16(v, this.endianness);
+            break;
+          case "uint32":
+            this.writeUint32(v, this.endianness);
+            break;
+          case "int32":
+            this.writeInt32(v, this.endianness);
+            break;
+          case "float32":
+            this.writeFloat32(v, this.endianness);
+            break;
+          case "float64":
+            this.writeFloat64(v, this.endianness);
+            break;
+          case "uint16be":
+            this.writeUint16(v, DataStream.BIG_ENDIAN);
+            break;
+          case "int16be":
+            this.writeInt16(v, DataStream.BIG_ENDIAN);
+            break;
+          case "uint32be":
+            this.writeUint32(v, DataStream.BIG_ENDIAN);
+            break;
+          case "int32be":
+            this.writeInt32(v, DataStream.BIG_ENDIAN);
+            break;
+          case "float32be":
+            this.writeFloat32(v, DataStream.BIG_ENDIAN);
+            break;
+          case "float64be":
+            this.writeFloat64(v, DataStream.BIG_ENDIAN);
+            break;
+          case "uint16le":
+            this.writeUint16(v, DataStream.LITTLE_ENDIAN);
+            break;
+          case "int16le":
+            this.writeInt16(v, DataStream.LITTLE_ENDIAN);
+            break;
+          case "uint32le":
+            this.writeUint32(v, DataStream.LITTLE_ENDIAN);
+            break;
+          case "int32le":
+            this.writeInt32(v, DataStream.LITTLE_ENDIAN);
+            break;
+          case "float32le":
+            this.writeFloat32(v, DataStream.LITTLE_ENDIAN);
+            break;
+          case "float64le":
+            this.writeFloat64(v, DataStream.LITTLE_ENDIAN);
+            break;
+          case "cstring":
+            this.writeCString(v, lengthOverride);
+            break;
+          case "string":
+            this.writeString(v, charset, lengthOverride);
+            break;
+          case "u16string":
+            this.writeUCS2String(v, this.endianness, lengthOverride);
+            break;
+          case "u16stringle":
+            this.writeUCS2String(v, DataStream.LITTLE_ENDIAN, lengthOverride);
+            break;
+          case "u16stringbe":
+            this.writeUCS2String(v, DataStream.BIG_ENDIAN, lengthOverride);
+            break;
+          default:
+            if (t.length == 3) {
+              var ta = t[1];
+              for (var i = 0; i < v.length; i++) {
+                this.writeType(ta, v[i]);
+              }
+              break;
+            } else {
+              this.writeStruct(t, v);
+              break;
+            }
+        }
+        if (lengthOverride != null) {
+          this.position = pos;
+          this._realloc(lengthOverride);
+          this.position = pos + lengthOverride;
+        }
+      };
+      if (typeof define === "function" && define.amd) {
+        define("DataStream", [], function() {
+          return DataStream;
+        });
+      }
+      if ((typeof module === "undefined" ? "undefined" : _typeof(module)) === "object" && module && module.exports) {
+        module.exports = DataStream;
+      }
+    }
+  });
+
+  // node_modules/msgreader/lib/MsgReader.js
+  var require_MsgReader = __commonJS({
+    "node_modules/msgreader/lib/MsgReader.js"(exports) {
+      "use strict";
+      Object.defineProperty(exports, "__esModule", {
+        value: true
+      });
+      var _createClass = /* @__PURE__ */ (function() {
+        function defineProperties(target, props) {
+          for (var i = 0; i < props.length; i++) {
+            var descriptor = props[i];
+            descriptor.enumerable = descriptor.enumerable || false;
+            descriptor.configurable = true;
+            if ("value" in descriptor) descriptor.writable = true;
+            Object.defineProperty(target, descriptor.key, descriptor);
+          }
+        }
+        return function(Constructor, protoProps, staticProps) {
+          if (protoProps) defineProperties(Constructor.prototype, protoProps);
+          if (staticProps) defineProperties(Constructor, staticProps);
+          return Constructor;
+        };
+      })();
+      var _utils = require_utils();
+      var _const = require_const();
+      var _const2 = _interopRequireDefault(_const);
+      var _DataStream = require_DataStream();
+      var _DataStream2 = _interopRequireDefault(_DataStream);
+      function _interopRequireDefault(obj) {
+        return obj && obj.__esModule ? obj : { default: obj };
+      }
+      function _classCallCheck(instance, Constructor) {
+        if (!(instance instanceof Constructor)) {
+          throw new TypeError("Cannot call a class as a function");
+        }
+      }
+      function isMSGFile(ds) {
+        ds.seek(0);
+        return (0, _utils.arraysEqual)(_const2.default.FILE_HEADER, ds.readInt8Array(_const2.default.FILE_HEADER.length));
+      }
+      function getBlockOffsetAt(msgData, offset) {
+        return (offset + 1) * msgData.bigBlockSize;
+      }
+      function getBlockAt(ds, msgData, offset) {
+        var startOffset = getBlockOffsetAt(msgData, offset);
+        ds.seek(startOffset);
+        return ds.readInt32Array(msgData.bigBlockLength);
+      }
+      function getNextBlockInner(ds, msgData, offset, blockOffsetData) {
+        var currentBlock = Math.floor(offset / msgData.bigBlockLength);
+        var currentBlockIndex = offset % msgData.bigBlockLength;
+        var startBlockOffset = blockOffsetData[currentBlock];
+        return getBlockAt(ds, msgData, startBlockOffset)[currentBlockIndex];
+      }
+      function getNextBlock(ds, msgData, offset) {
+        return getNextBlockInner(ds, msgData, offset, msgData.batData);
+      }
+      function getNextBlockSmall(ds, msgData, offset) {
+        return getNextBlockInner(ds, msgData, offset, msgData.sbatData);
+      }
+      function parseMsgData(ds) {
+        var msgData = headerData(ds);
+        msgData.batData = batData(ds, msgData);
+        msgData.sbatData = sbatData(ds, msgData);
+        if (msgData.xbatCount > 0) {
+          xbatData(ds, msgData);
+        }
+        msgData.propertyData = propertyData(ds, msgData);
+        msgData.fieldsData = fieldsData(ds, msgData);
+        return msgData;
+      }
+      function headerData(ds) {
+        var headerData2 = {};
+        headerData2.bigBlockSize = ds.readByte(
+          /*const position*/
+          30
+        ) == _const2.default.MSG.L_BIG_BLOCK_MARK ? _const2.default.MSG.L_BIG_BLOCK_SIZE : _const2.default.MSG.S_BIG_BLOCK_SIZE;
+        headerData2.bigBlockLength = headerData2.bigBlockSize / 4;
+        headerData2.xBlockLength = headerData2.bigBlockLength - 1;
+        headerData2.batCount = ds.readInt(_const2.default.MSG.HEADER.BAT_COUNT_OFFSET);
+        headerData2.propertyStart = ds.readInt(_const2.default.MSG.HEADER.PROPERTY_START_OFFSET);
+        headerData2.sbatStart = ds.readInt(_const2.default.MSG.HEADER.SBAT_START_OFFSET);
+        headerData2.sbatCount = ds.readInt(_const2.default.MSG.HEADER.SBAT_COUNT_OFFSET);
+        headerData2.xbatStart = ds.readInt(_const2.default.MSG.HEADER.XBAT_START_OFFSET);
+        headerData2.xbatCount = ds.readInt(_const2.default.MSG.HEADER.XBAT_COUNT_OFFSET);
+        return headerData2;
+      }
+      function batCountInHeader(msgData) {
+        var maxBatsInHeader = (_const2.default.MSG.S_BIG_BLOCK_SIZE - _const2.default.MSG.HEADER.BAT_START_OFFSET) / 4;
+        return Math.min(msgData.batCount, maxBatsInHeader);
+      }
+      function batData(ds, msgData) {
+        var result = new Array(batCountInHeader(msgData));
+        ds.seek(_const2.default.MSG.HEADER.BAT_START_OFFSET);
+        for (var i = 0; i < result.length; i++) {
+          result[i] = ds.readInt32();
+        }
+        return result;
+      }
+      function sbatData(ds, msgData) {
+        var result = [];
+        var startIndex = msgData.sbatStart;
+        for (var i = 0; i < msgData.sbatCount && startIndex != _const2.default.MSG.END_OF_CHAIN; i++) {
+          result.push(startIndex);
+          startIndex = getNextBlock(ds, msgData, startIndex);
+        }
+        return result;
+      }
+      function xbatData(ds, msgData) {
+        var batCount = batCountInHeader(msgData);
+        var batCountTotal = msgData.batCount;
+        var remainingBlocks = batCountTotal - batCount;
+        var nextBlockAt = msgData.xbatStart;
+        for (var i = 0; i < msgData.xbatCount; i++) {
+          var xBatBlock = getBlockAt(ds, msgData, nextBlockAt);
+          nextBlockAt = xBatBlock[msgData.xBlockLength];
+          var blocksToProcess = Math.min(remainingBlocks, msgData.xBlockLength);
+          for (var j = 0; j < blocksToProcess; j++) {
+            var blockStartAt = xBatBlock[j];
+            if (blockStartAt == _const2.default.MSG.UNUSED_BLOCK || blockStartAt == _const2.default.MSG.END_OF_CHAIN) {
+              break;
+            }
+            msgData.batData.push(blockStartAt);
+          }
+          remainingBlocks -= blocksToProcess;
+        }
+      }
+      function propertyData(ds, msgData) {
+        var props = [];
+        var currentOffset = msgData.propertyStart;
+        while (currentOffset != _const2.default.MSG.END_OF_CHAIN) {
+          convertBlockToProperties(ds, msgData, currentOffset, props);
+          currentOffset = getNextBlock(ds, msgData, currentOffset);
+        }
+        createPropertyHierarchy(
+          props,
+          /*property with index 0 (zero) always as root*/
+          props[0]
+        );
+        return props;
+      }
+      function convertName(ds, offset) {
+        var nameLength = ds.readShort(offset + _const2.default.MSG.PROP.NAME_SIZE_OFFSET);
+        if (nameLength < 1) {
+          return "";
+        } else {
+          return ds.readStringAt(offset, nameLength / 2);
+        }
+      }
+      function convertProperty(ds, index, offset) {
+        return {
+          index,
+          type: ds.readByte(offset + _const2.default.MSG.PROP.TYPE_OFFSET),
+          name: convertName(ds, offset),
+          // hierarchy
+          previousProperty: ds.readInt(offset + _const2.default.MSG.PROP.PREVIOUS_PROPERTY_OFFSET),
+          nextProperty: ds.readInt(offset + _const2.default.MSG.PROP.NEXT_PROPERTY_OFFSET),
+          childProperty: ds.readInt(offset + _const2.default.MSG.PROP.CHILD_PROPERTY_OFFSET),
+          // data offset
+          startBlock: ds.readInt(offset + _const2.default.MSG.PROP.START_BLOCK_OFFSET),
+          sizeBlock: ds.readInt(offset + _const2.default.MSG.PROP.SIZE_OFFSET)
+        };
+      }
+      function convertBlockToProperties(ds, msgData, propertyBlockOffset, props) {
+        var propertyCount = msgData.bigBlockSize / _const2.default.MSG.PROP.PROPERTY_SIZE;
+        var propertyOffset = getBlockOffsetAt(msgData, propertyBlockOffset);
+        for (var i = 0; i < propertyCount; i++) {
+          var propertyType = ds.readByte(propertyOffset + _const2.default.MSG.PROP.TYPE_OFFSET);
+          switch (propertyType) {
+            case _const2.default.MSG.PROP.TYPE_ENUM.ROOT:
+            case _const2.default.MSG.PROP.TYPE_ENUM.DIRECTORY:
+            case _const2.default.MSG.PROP.TYPE_ENUM.DOCUMENT:
+              props.push(convertProperty(ds, props.length, propertyOffset));
+              break;
+            default:
+              props.push(null);
+          }
+          propertyOffset += _const2.default.MSG.PROP.PROPERTY_SIZE;
+        }
+      }
+      function createPropertyHierarchy(props, nodeProperty) {
+        if (nodeProperty.childProperty == _const2.default.MSG.PROP.NO_INDEX) {
+          return;
+        }
+        nodeProperty.children = [];
+        var children = [nodeProperty.childProperty];
+        while (children.length != 0) {
+          var currentIndex = children.shift();
+          var current = props[currentIndex];
+          if (current == null) {
+            continue;
+          }
+          nodeProperty.children.push(currentIndex);
+          if (current.type == _const2.default.MSG.PROP.TYPE_ENUM.DIRECTORY) {
+            createPropertyHierarchy(props, current);
+          }
+          if (current.previousProperty != _const2.default.MSG.PROP.NO_INDEX) {
+            children.push(current.previousProperty);
+          }
+          if (current.nextProperty != _const2.default.MSG.PROP.NO_INDEX) {
+            children.push(current.nextProperty);
+          }
+        }
+      }
+      function fieldsData(ds, msgData) {
+        var fields = {
+          attachments: [],
+          recipients: []
+        };
+        fieldsDataDir(ds, msgData, msgData.propertyData[0], fields);
+        return fields;
+      }
+      function fieldsDataDir(ds, msgData, dirProperty, fields) {
+        if (dirProperty.children && dirProperty.children.length > 0) {
+          for (var i = 0; i < dirProperty.children.length; i++) {
+            var childProperty = msgData.propertyData[dirProperty.children[i]];
+            if (childProperty.type == _const2.default.MSG.PROP.TYPE_ENUM.DIRECTORY) {
+              fieldsDataDirInner(ds, msgData, childProperty, fields);
+            } else if (childProperty.type == _const2.default.MSG.PROP.TYPE_ENUM.DOCUMENT && childProperty.name.indexOf(_const2.default.MSG.FIELD.PREFIX.DOCUMENT) == 0) {
+              fieldsDataDocument(ds, msgData, childProperty, fields);
+            }
+          }
+        }
+      }
+      function fieldsDataDirInner(ds, msgData, dirProperty, fields) {
+        if (dirProperty.name.indexOf(_const2.default.MSG.FIELD.PREFIX.ATTACHMENT) == 0) {
+          var attachmentField = {};
+          fields.attachments.push(attachmentField);
+          fieldsDataDir(ds, msgData, dirProperty, attachmentField);
+        } else if (dirProperty.name.indexOf(_const2.default.MSG.FIELD.PREFIX.RECIPIENT) == 0) {
+          var recipientField = {};
+          fields.recipients.push(recipientField);
+          fieldsDataDir(ds, msgData, dirProperty, recipientField);
+        } else {
+          var childFieldType = getFieldType(dirProperty);
+          if (childFieldType != _const2.default.MSG.FIELD.DIR_TYPE.INNER_MSG) {
+            fieldsDataDir(ds, msgData, dirProperty, fields);
+          } else {
+            fields.innerMsgContent = true;
+          }
+        }
+      }
+      function fieldsDataDocument(ds, msgData, documentProperty, fields) {
+        var value = documentProperty.name.substring(12).toLowerCase();
+        var fieldClass = value.substring(0, 4);
+        var fieldType = value.substring(4, 8);
+        var fieldName = _const2.default.MSG.FIELD.NAME_MAPPING[fieldClass];
+        if (fieldName) {
+          fields[fieldName] = getFieldValue(ds, msgData, documentProperty, fieldType);
+        }
+        if (fieldClass == _const2.default.MSG.FIELD.CLASS_MAPPING.ATTACHMENT_DATA) {
+          fields["dataId"] = documentProperty.index;
+          fields["contentLength"] = documentProperty.sizeBlock;
+        }
+      }
+      function getFieldType(fieldProperty) {
+        var value = fieldProperty.name.substring(12).toLowerCase();
+        return value.substring(4, 8);
+      }
+      var extractorFieldValue = {
+        sbat: {
+          "extractor": function extractDataViaSbat(ds, msgData, fieldProperty, dataTypeExtractor) {
+            var chain = getChainByBlockSmall(ds, msgData, fieldProperty);
+            if (chain.length == 1) {
+              return readDataByBlockSmall(ds, msgData, fieldProperty.startBlock, fieldProperty.sizeBlock, dataTypeExtractor);
+            } else if (chain.length > 1) {
+              return readChainDataByBlockSmall(ds, msgData, fieldProperty, chain, dataTypeExtractor);
+            }
+            return null;
+          },
+          dataType: {
+            "string": function extractBatString(ds, msgData, blockStartOffset, bigBlockOffset, blockSize) {
+              ds.seek(blockStartOffset + bigBlockOffset);
+              return ds.readString(blockSize);
+            },
+            "unicode": function extractBatUnicode(ds, msgData, blockStartOffset, bigBlockOffset, blockSize) {
+              ds.seek(blockStartOffset + bigBlockOffset);
+              return ds.readUCS2String(blockSize / 2);
+            },
+            "binary": function extractBatBinary(ds, msgData, blockStartOffset, bigBlockOffset, blockSize) {
+              ds.seek(blockStartOffset + bigBlockOffset);
+              var toReadLength = Math.min(Math.min(msgData.bigBlockSize - bigBlockOffset, blockSize), _const2.default.MSG.SMALL_BLOCK_SIZE);
+              return ds.readUint8Array(toReadLength);
+            }
+          }
+        },
+        bat: {
+          "extractor": function extractDataViaBat(ds, msgData, fieldProperty, dataTypeExtractor) {
+            var offset = getBlockOffsetAt(msgData, fieldProperty.startBlock);
+            ds.seek(offset);
+            return dataTypeExtractor(ds, fieldProperty);
+          },
+          dataType: {
+            "string": function extractSbatString(ds, fieldProperty) {
+              return ds.readString(fieldProperty.sizeBlock);
+            },
+            "unicode": function extractSbatUnicode(ds, fieldProperty) {
+              return ds.readUCS2String(fieldProperty.sizeBlock / 2);
+            },
+            "binary": function extractSbatBinary(ds, fieldProperty) {
+              return ds.readUint8Array(fieldProperty.sizeBlock);
+            }
+          }
+        }
+      };
+      function readDataByBlockSmall(ds, msgData, startBlock, blockSize, dataTypeExtractor) {
+        var byteOffset = startBlock * _const2.default.MSG.SMALL_BLOCK_SIZE;
+        var bigBlockNumber = Math.floor(byteOffset / msgData.bigBlockSize);
+        var bigBlockOffset = byteOffset % msgData.bigBlockSize;
+        var rootProp = msgData.propertyData[0];
+        var nextBlock = rootProp.startBlock;
+        for (var i = 0; i < bigBlockNumber; i++) {
+          nextBlock = getNextBlock(ds, msgData, nextBlock);
+        }
+        var blockStartOffset = getBlockOffsetAt(msgData, nextBlock);
+        return dataTypeExtractor(ds, msgData, blockStartOffset, bigBlockOffset, blockSize);
+      }
+      function readChainDataByBlockSmall(ds, msgData, fieldProperty, chain, dataTypeExtractor) {
+        var resultData = new Int8Array(fieldProperty.sizeBlock);
+        for (var i = 0, idx = 0; i < chain.length; i++) {
+          var data = readDataByBlockSmall(ds, msgData, chain[i], _const2.default.MSG.SMALL_BLOCK_SIZE, extractorFieldValue.sbat.dataType.binary);
+          for (var j = 0; j < data.length; j++) {
+            resultData[idx++] = data[j];
+          }
+        }
+        var localDs = new _DataStream2.default(resultData, 0, _DataStream2.default.LITTLE_ENDIAN);
+        return dataTypeExtractor(localDs, msgData, 0, 0, fieldProperty.sizeBlock);
+      }
+      function getChainByBlockSmall(ds, msgData, fieldProperty) {
+        var blockChain = [];
+        var nextBlockSmall = fieldProperty.startBlock;
+        while (nextBlockSmall != _const2.default.MSG.END_OF_CHAIN) {
+          blockChain.push(nextBlockSmall);
+          nextBlockSmall = getNextBlockSmall(ds, msgData, nextBlockSmall);
+        }
+        return blockChain;
+      }
+      function getFieldValue(ds, msgData, fieldProperty, type) {
+        var value = null;
+        var valueExtractor = fieldProperty.sizeBlock < _const2.default.MSG.BIG_BLOCK_MIN_DOC_SIZE ? extractorFieldValue.sbat : extractorFieldValue.bat;
+        var dataTypeExtractor = valueExtractor.dataType[_const2.default.MSG.FIELD.TYPE_MAPPING[type]];
+        if (dataTypeExtractor) {
+          value = valueExtractor.extractor(ds, msgData, fieldProperty, dataTypeExtractor);
+        }
+        return value;
+      }
+      var MsgReader2 = (function() {
+        function MsgReader3(arrayBuffer) {
+          _classCallCheck(this, MsgReader3);
+          this.ds = new _DataStream2.default(arrayBuffer, 0, _DataStream2.default.LITTLE_ENDIAN);
+        }
+        _createClass(MsgReader3, [{
+          key: "getFileData",
+          value: function getFileData() {
+            if (!isMSGFile(this.ds)) {
+              return { error: "Unsupported file type!" };
+            }
+            if (this.fileData == null) {
+              this.fileData = parseMsgData(this.ds);
+            }
+            return this.fileData.fieldsData;
+          }
+          /**
+           Reads an attachment content by key/ID
+             @return {Object} The attachment for specific attachment key
+            */
+        }, {
+          key: "getAttachment",
+          value: function getAttachment(attach) {
+            var attachData = typeof attach === "number" ? this.fileData.fieldsData.attachments[attach] : attach;
+            var fieldProperty = this.fileData.propertyData[attachData.dataId];
+            var fieldData = getFieldValue(this.ds, this.fileData, fieldProperty, getFieldType(fieldProperty));
+            return { fileName: attachData.fileName, content: fieldData };
+          }
+        }]);
+        return MsgReader3;
+      })();
+      exports.default = MsgReader2;
+    }
+  });
+
+  // node_modules/msgreader/lib/index.js
+  var require_lib = __commonJS({
+    "node_modules/msgreader/lib/index.js"(exports) {
+      "use strict";
+      Object.defineProperty(exports, "__esModule", {
+        value: true
+      });
+      var _MsgReader = require_MsgReader();
+      var _MsgReader2 = _interopRequireDefault(_MsgReader);
+      function _interopRequireDefault(obj) {
+        return obj && obj.__esModule ? obj : { default: obj };
+      }
+      exports.default = _MsgReader2.default;
+    }
+  });
+
+  // entry.js
+  var import_msgreader = __toESM(require_lib());
+  window.MsgReader = import_msgreader.default;
+})();
+
+</script>
+<script>
+(function() {
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const errorBox = document.getElementById('errorBox');
+  const emailView = document.getElementById('emailView');
+  const dropSection = document.getElementById('dropSection');
+  const fileList = document.getElementById('fileList');
+  const backBtn = document.getElementById('backBtn');
+  const envelope = document.getElementById('envelope');
+
+  let currentReader = null;
+
+  // ── Drag & drop ──
+  ['dragenter','dragover'].forEach(e =>
+    dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.add('drag-over'); })
+  );
+  ['dragleave','drop'].forEach(e =>
+    dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.remove('drag-over'); })
+  );
+  dropzone.addEventListener('drop', ev => {
+    const files = [...ev.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.msg'));
+    files.length ? handleFiles(files) : showError('Lütfen .msg dosyası seçin.');
+  });
+  fileInput.addEventListener('change', ev => {
+    if (ev.target.files.length) handleFiles([...ev.target.files]);
+  });
+  backBtn.addEventListener('click', () => {
+    emailView.classList.remove('active');
+    dropSection.classList.remove('hidden');
+  });
+
+  function showError(msg) {
+    errorBox.textContent = msg; errorBox.classList.add('show');
+    setTimeout(() => errorBox.classList.remove('show'), 4000);
+  }
+
+  function handleFiles(files) {
+    if (files.length === 1) return readMsg(files[0]);
+    fileList.innerHTML = '';
+    files.forEach(f => {
+      const el = document.createElement('div');
+      el.className = 'file-chip';
+      el.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>'
+        + '<span class="file-chip-name">' + esc(f.name) + '</span><span class="file-chip-arrow">›</span>';
+      el.onclick = () => readMsg(f);
+      fileList.appendChild(el);
+    });
+    fileList.classList.add('show');
+  }
+
+  function readMsg(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const mr = new MsgReader(e.target.result);
+        const data = mr.getFileData();
+        if (data.error) { showError(data.error); return; }
+        currentReader = mr;
+        render(data, file.name);
+      } catch(err) { console.error(err); showError('Dosya okunamadı: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ── Helpers ──
+  function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+
+  function initials(n) {
+    if (!n) return '?';
+    const p = n.trim().split(/\s+/);
+    return p.length >= 2 ? (p[0][0]+p[p.length-1][0]).toUpperCase() : n.substring(0,2).toUpperCase();
+  }
+
+  function fmtSize(b) {
+    if (!b) return '';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+  }
+
+  function extType(ext) {
+    if (!ext) return 'other';
+    ext = ext.replace('.','').toLowerCase();
+    if (ext === 'pdf') return 'pdf';
+    if (['jpg','jpeg','png','gif','bmp','webp','svg','tiff'].includes(ext)) return 'img';
+    if (['doc','docx','rtf','odt'].includes(ext)) return 'doc';
+    if (['xls','xlsx','xlsm','csv'].includes(ext)) return 'xls';
+    if (['zip','rar','7z','tar','gz'].includes(ext)) return 'zip';
+    return 'other';
+  }
+
+  function parseDate(headers) {
+    if (!headers) return null;
+    const m = headers.match(/^Date:\s*(.+)$/im);
+    if (m) { try { const d = new Date(m[1].trim()); if (!isNaN(d)) return d; } catch(e) {} }
+    return null;
+  }
+
+  function fmtDate(d) {
+    if (!d) return '—';
+    return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Decode binary bodyHtml to string
+  function decodeBinary(data) {
+    if (!data) return null;
+    if (typeof data === 'string') return data;
+    if (data instanceof Array || data instanceof Uint8Array || ArrayBuffer.isView(data)) {
+      try { return new TextDecoder('utf-8').decode(new Uint8Array(data)); } catch(e) {}
+      try { return new TextDecoder('iso-8859-9').decode(new Uint8Array(data)); } catch(e) {}
+      // fallback
+      let s = ''; for (let i = 0; i < data.length; i++) s += String.fromCharCode(data[i] & 0xff); return s;
+    }
+    return null;
+  }
+
+  // ── Format plain text body ──
+  function formatBody(raw) {
+    if (!raw) return '<p style="color:var(--text-dim);text-align:center;">İçerik bulunamadı</p>';
+    const text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const blocks = text.split(/\n{2,}/);
+
+    const disclaimerRe = /^(bu (e-?posta|mesaj|ileti|mail)|this (e-?mail|message|communication)|confidential|disclaimer|gizlilik|yasal uyar|uyarı|dikkat|önemli (not|uyar)|legal notice|privilege|feragat|bilgilendirme|sorumluluk reddi|kişisel veri|kvkk|gdpr|6698|not:|note:|lütfen dikkat|please note|if you (are|have) (not|received)|iş ?bu)/i;
+    const sigRe = /^(saygılarımla|saygılar|iyi çalışmalar|regards|best regards|kind regards|sincerely|thanks|thank you|teşekkürler|sevgilerimle|kolay gelsin)/i;
+    const sepRe = /^[\-_=~]{3,}\s*$/;
+
+    let html = '';
+    let sigStarted = false;
+    let discBuf = [];
+
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i].trim();
+      if (!b) continue;
+      const lines = b.split('\n');
+
+      // Disclaimer detection
+      if (disclaimerRe.test(b)) {
+        for (let j = i; j < blocks.length; j++) {
+          const db = blocks[j].trim();
+          if (db) discBuf.push(esc(db).replace(/\n/g, '<br>'));
+        }
+        break;
+      }
+
+      // Signature separator
+      if (!sigStarted && (lines.some(l => sepRe.test(l.trim())) || sigRe.test(lines[0].trim()))) {
+        sigStarted = true;
+      }
+
+      if (sigStarted) {
+        html += '<div class="sig-block">' + lines.map(l => esc(l)).join('<br>') + '</div>';
+      } else {
+        html += '<div class="para">' + lines.map(l => esc(l)).join('<br>') + '</div>';
+      }
+    }
+
+    if (discBuf.length) {
+      html += '<div class="disclaimer-block">' + discBuf.join('<br><br>') + '</div>';
+    }
+
+    return html;
+  }
+
+  // ── Format headers with highlighting ──
+  function formatHeaders(raw) {
+    if (!raw) return '<span style="color:var(--text-dim)">Başlık bilgisi yok</span>';
+    return esc(raw).replace(/^([A-Za-z][A-Za-z0-9\-]*):/gm, '<span class="h-key">$1:</span>');
+  }
+
+  // ── Main render ──
+  function render(data, fileName) {
+    dropSection.classList.add('hidden');
+    emailView.classList.remove('active');
+    void envelope.offsetWidth; // reflow for animation
+    emailView.classList.add('active');
+
+    const sName = data.senderName || 'Bilinmeyen Gönderen';
+    const sEmail = data.senderSmtp || data.senderEmail || '';
+    const date = parseDate(data.headers);
+    const to = data.displayTo || (data.recipients || []).filter(r => r.recipType !== '2').map(r => r.name ? (r.email ? r.name + ' <' + r.email + '>' : r.name) : r.email).join('; ') || '—';
+    const cc = data.displayCc || '';
+    const attachments = data.attachments || [];
+
+    // ── Build envelope HTML ──
+    let h = '';
+
+    // Header section
+    h += '<div class="envelope-header">';
+    h += '  <div class="env-subject">' + esc(data.subject || '(Konu yok)') + '</div>';
+    h += '  <div class="env-sender-line">';
+    h += '    <div class="env-avatar">' + initials(sName) + '</div>';
+    h += '    <div class="env-sender-info">';
+    h += '      <div class="env-sender-name">' + esc(sName) + '</div>';
+    if (sEmail) h += '      <div class="env-sender-email">' + esc(sEmail) + '</div>';
+    h += '    </div>';
+    h += '    <div class="env-date">' + fmtDate(date) + '</div>';
+    h += '  </div>';
+    h += '  <div class="env-recipients">';
+    h += '    <div class="env-row"><div class="env-label">Kime:</div><div class="env-value">' + esc(to) + '</div></div>';
+    if (cc) h += '    <div class="env-row"><div class="env-label">Bilgi:</div><div class="env-value">' + esc(cc) + '</div></div>';
+    h += '  </div>';
+    h += '</div>';
+
+    // Tabs
+    h += '<div class="env-tabs">';
+    h += '  <button class="env-tab active" data-t="body">İçerik</button>';
+    h += '  <button class="env-tab" data-t="attach">Ekler' + (attachments.length ? '<span class="tbadge">' + attachments.length + '</span>' : '') + '</button>';
+    h += '  <button class="env-tab" data-t="headers">Başlıklar</button>';
+    h += '</div>';
+
+    // ── Body panel ──
+    const htmlBody = decodeBinary(data.bodyHtml);
+    h += '<div class="env-panel active" id="p-body">';
+    if (htmlBody) {
+      h += '<div class="env-body env-body-html"><iframe id="bframe" sandbox="allow-same-origin" srcdoc="' + esc(htmlBody) + '"></iframe></div>';
+    } else {
+      h += '<div class="env-body env-body-text">' + formatBody(data.body) + '</div>';
+    }
+    h += '</div>';
+
+    // ── Attachments panel ──
+    h += '<div class="env-panel" id="p-attach">';
+    if (attachments.length === 0) {
+      h += '<div class="no-att"><svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg><p>Bu e-postada ek bulunmuyor</p></div>';
+    } else {
+      h += '<div class="env-attach">';
+      attachments.forEach((att, i) => {
+        const ext = (att.extension || att.fileName?.split('.').pop() || '').replace('.','');
+        const et = extType(ext);
+        h += '<div class="att-card" id="ac-' + i + '">';
+        h += '  <div class="att-icon ' + et + '">' + (ext.toUpperCase() || 'FILE') + '</div>';
+        h += '  <div class="att-info"><div class="att-name">' + esc(att.fileName || 'attachment_' + i) + '</div><div class="att-size">' + fmtSize(att.contentLength) + '</div></div>';
+        h += '  <button class="att-btn" data-i="' + i + '">İndir</button>';
+        h += '</div>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+
+    // ── Headers panel ──
+    h += '<div class="env-panel" id="p-headers"><div class="env-headers">' + formatHeaders(data.headers) + '</div></div>';
+
+    envelope.innerHTML = h;
+
+    // ── Wire up iframe auto-height ──
+    const bframe = document.getElementById('bframe');
+    if (bframe) {
+      bframe.addEventListener('load', () => {
+        try {
+          const doc = bframe.contentDocument || bframe.contentWindow.document;
+          // Inject base style for readability
+          const style = doc.createElement('style');
+          style.textContent = 'body{font-family:Segoe UI,Inter,-apple-system,sans-serif;font-size:14px;line-height:1.65;color:#1a1a1a;margin:16px 4px;} img{max-width:100%;height:auto;}';
+          doc.head.appendChild(style);
+          bframe.style.height = (doc.body.scrollHeight + 32) + 'px';
+        } catch(e) {}
+      });
+      // Force srcdoc render (the esc'd version in attribute won't work well)
+      bframe.removeAttribute('srcdoc');
+      bframe.srcdoc = htmlBody;
+    }
+
+    // ── Tabs ──
+    envelope.querySelectorAll('.env-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        envelope.querySelectorAll('.env-tab').forEach(t => t.classList.toggle('active', t === tab));
+        const panels = { body: 'p-body', attach: 'p-attach', headers: 'p-headers' };
+        Object.entries(panels).forEach(([k,v]) => {
+          document.getElementById(v)?.classList.toggle('active', k === tab.dataset.t);
+        });
+      });
+    });
+
+    // ── Attachment previews & downloads ──
+    attachments.forEach((att, i) => {
+      const ext = (att.extension || att.fileName?.split('.').pop() || '').replace('.','').toLowerCase();
+      if (['jpg','jpeg','png','gif','bmp','webp'].includes(ext)) {
+        try {
+          const a = currentReader.getAttachment(i);
+          if (a?.content) {
+            const blob = new Blob([new Uint8Array(a.content)], { type: 'image/' + (ext==='jpg'?'jpeg':ext) });
+            const url = URL.createObjectURL(blob);
+            const card = document.getElementById('ac-' + i);
+            if (card) {
+              const prev = document.createElement('div');
+              prev.className = 'att-preview';
+              prev.innerHTML = '<img src="' + url + '" alt="önizleme">';
+              card.after(prev);
+            }
+          }
+        } catch(e) {}
+      }
+    });
+
+    envelope.querySelectorAll('.att-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.i);
+        try {
+          const a = currentReader.getAttachment(idx);
+          if (a?.content) {
+            const blob = new Blob([new Uint8Array(a.content)]);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url; link.download = a.fileName || 'attachment_' + idx;
+            document.body.appendChild(link); link.click();
+            document.body.removeChild(link); URL.revokeObjectURL(url);
+          }
+        } catch(err) { showError('Ek indirilemedi: ' + err.message); }
+      });
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
